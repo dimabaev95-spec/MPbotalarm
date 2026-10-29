@@ -20,6 +20,17 @@ import os
 import sys
 import time
 import requests
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+TZ = ZoneInfo("Europe/Kyiv")
+
+
+def fmt_duration(delta):
+    """Формат тривалості: '1 год 12 хв' або '23 хв'."""
+    minutes = max(1, round(delta.total_seconds() / 60))
+    h, m = divmod(minutes, 60)
+    return f"{h} год {m} хв" if h else f"{m} хв"
 
 API = "https://api.ukrainealarm.com/api/v3"
 def _env(name):
@@ -127,14 +138,25 @@ def main():
         return
 
     was_active = None  # None = перший цикл
+    started_at = None  # момент початку тривоги (час, коли бот її помітив)
     while True:
         try:
             now_active = air_alert_active(ids)
             if now_active and was_active is not True:
-                tg_send("🚨 Повітряна тривога в м. Могилів-Подільський. "
+                started_at = datetime.now(TZ)
+                tg_send(f"🚨 Повітряна тривога в м. Могилів-Подільський ({started_at:%H:%M}). "
                         "Дійте згідно з інструкцією.")
             elif was_active is True and not now_active:
-                tg_send("✅ Відбій повітряної тривоги в м. Могилів-Подільський.")
+                ended_at = datetime.now(TZ)
+                if started_at:
+                    tg_send(f"✅ Відбій повітряної тривоги в м. Могилів-Подільський "
+                            f"({ended_at:%H:%M}).\n"
+                            f"Тривала {fmt_duration(ended_at - started_at)} "
+                            f"(з {started_at:%H:%M}).")
+                else:
+                    tg_send(f"✅ Відбій повітряної тривоги в м. Могилів-Подільський "
+                            f"({ended_at:%H:%M}).")
+                started_at = None
             was_active = now_active  # оновлюємо лише після успішної відправки
         except requests.RequestException as e:
             print("Помилка запиту:", e, file=sys.stderr, flush=True)
