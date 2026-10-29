@@ -24,7 +24,10 @@ import requests
 API = "https://api.ukrainealarm.com/api/v3"
 def _env(name):
     """Читає змінну, прибирає пробіли, переноси рядків і випадкові лапки."""
-    return os.environ.get(name, "").strip().strip('"').strip("'").strip()
+    raw = os.environ.get(name, "").strip().strip('"').strip("'")
+    # Ключ UkraineAlarm має вигляд "номер:код". При копіюванні з листа між частинами
+    # часто з'являється пробіл/перенос рядка - видаляємо будь-які пробільні символи всередині.
+    return "".join(raw.split())
 
 
 KEY = _env("UKRAINEALARM_API_KEY")
@@ -69,7 +72,8 @@ def walk(node, path, found):
 
 def resolve_region_ids():
     """Повертає ID лише самого знайденого вузла (громада/місто), без області та району вище."""
-    env_ids = os.environ.get("REGION_IDS")
+    # За замовчуванням: 33 = Могилів-Подільський район, 172 = м. Могилів-Подільський (громада)
+    env_ids = os.environ.get("REGION_IDS", "33,172").strip()
     if env_ids:
         return {i.strip() for i in env_ids.split(",") if i.strip()}, f"REGION_IDS={env_ids}"
     tree = api_get("/regions")
