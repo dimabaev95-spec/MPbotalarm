@@ -22,9 +22,14 @@ import time
 import requests
 
 API = "https://api.ukrainealarm.com/api/v3"
-KEY = os.environ.get("UKRAINEALARM_API_KEY", "")
-TG_TOKEN = os.environ.get("TG_BOT_TOKEN", "")
-TG_CHAT = os.environ.get("TG_CHAT_ID", "")
+def _env(name):
+    """Читає змінну, прибирає пробіли, переноси рядків і випадкові лапки."""
+    return os.environ.get(name, "").strip().strip('"').strip("'").strip()
+
+
+KEY = _env("UKRAINEALARM_API_KEY")
+TG_TOKEN = _env("TG_BOT_TOKEN")
+TG_CHAT = _env("TG_CHAT_ID")
 NAME = os.environ.get("REGION_NAME", "Могилів-Подільськ")
 POLL = int(os.environ.get("POLL_SECONDS", "30"))
 ALERT_TYPE = "AIR"
@@ -34,6 +39,13 @@ HEADERS = {"Authorization": KEY}
 
 def api_get(path):
     r = requests.get(f"{API}{path}", headers=HEADERS, timeout=15)
+    if r.status_code in (401, 403):
+        # Не падаємо в нескінченний рестарт: пояснюємо і чекаємо.
+        print(f"API відхилило ключ (HTTP {r.status_code}) на {path}. Довжина ключа: {len(KEY)}. "
+              f"Перевірте UKRAINEALARM_API_KEY у Variables (без лапок/пробілів) "
+              f"і що ключ активований на api.ukrainealarm.com.", file=sys.stderr, flush=True)
+        time.sleep(300)
+        sys.exit(1)
     r.raise_for_status()
     return r.json()
 
